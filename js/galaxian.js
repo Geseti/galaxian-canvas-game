@@ -10,9 +10,11 @@
 			this.bullet = new Image();
 			this.enemy = new Image();
 			this.enemyBullet = new Image();
+			this.explosion = new Image();
+			this.shipImmune = new Image();
 			
 			// Ensure all images have loaded before starting the game
-			var numImages = 5;
+			var numImages = 7;
 			var numLoaded = 0;
 			function imageLoaded() {
 				numLoaded++;
@@ -35,13 +37,20 @@
 			this.enemyBullet.onload = function() {
 				imageLoaded();
 			}
-			
+			this.explosion.onload = function() {
+				imageLoaded();
+			}
+			this.shipImmune.onload = function() {
+				imageLoaded();
+			}
 			// Set images src
 			this.background.src = "imgs/bg.png";
 			this.spaceship.src = "imgs/ship.png";
 			this.bullet.src = "imgs/bullet.png";
 			this.enemy.src = "imgs/enemy.png"
 			this.enemyBullet.src = "imgs/bullet_enemy.png"
+			this.explosion.src = "imgs/explosion.png";
+			this.shipImmune.src = "imgs/ship_immune.png";
 		}
 		
 		/**
@@ -69,6 +78,9 @@
 			this.draw = function() {
 			};
 			this.move = function() {
+			};
+			this.hide = function() {
+				//this.style.visibility = 'hidden';
 			};
 			this.isCollidableWith = function(object) {
 				return (this.collidableWith === object.type);
@@ -150,12 +162,14 @@
 					// Initialize the enemy pool object
 					this.enemyPool = new Pool(30);
 					this.enemyPool.init("enemy");
-					this.spawnWave();
+					this.spawnWave(1);
 					
 					
 					this.enemyBulletPool = new Pool(50);
 					this.enemyBulletPool.init("enemyBullet");
 					this.playerScore = 0;
+					this.playerLevel = 1;
+					this.playerLives = 3;
 					
 					// Start QuadTree
 					this.quadTree = new QuadTree({x:0,y:0,width:this.mainCanvas.width,height:this.mainCanvas.height});
@@ -185,15 +199,29 @@
 			};
 			
 			// Spawn a new wave of enemies
-			this.spawnWave = function() {
+			this.spawnWave = function(level) {
 				var height = imageRepository.enemy.height;
 				var width = imageRepository.enemy.width;
 				var x = 100;
-				var y = -height;
-				var spacer = y * 1.5;
+				var y = 45;
+				var spacer = height * -1.25;
 				var enemyPoolSize = this.enemyPool.size;
 				//console.log("Enemy Pool Size:" + enemyPoolSize);
-				for (var i = 1; i <= 18; i++) {
+				
+				//set the number of rows (difficulty) based on the current level
+				var maxRow
+				if (level === 1){
+					maxRow = 3;
+				} else if (level === 2) {
+					maxRow = 4;
+				} else if (level >= 3) {
+					maxRow = 5;
+				}
+				
+				var currentPool = maxRow * 6;
+				
+				for (var i = 1; i <= currentPool; i++) {
+					//console.log("height: " + y);
 					this.enemyPool.get(x,y,2);
 					x += width + 25;
 					if (i % 6 == 0) {
@@ -227,9 +255,11 @@
 							   imageRepository.spaceship.width, imageRepository.spaceship.height);
 				
 				this.enemyPool.init("enemy");
-				this.spawnWave();
+				this.spawnWave(game.playerLevel);
 				this.enemyBulletPool.init("enemyBullet");
 				this.playerScore = 0;
+				this.playerLevel = 1;
+				this.playerLives = 3;
 				this.backgroundAudio.currentTime = 0;
 				this.backgroundAudio.play();
 				this.start();
@@ -268,6 +298,18 @@
 		function animate() {
 			
 			document.getElementById('score').innerHTML = game.playerScore;
+			document.getElementById('level').innerHTML = game.playerLevel;
+			
+			var lives = game.playerLives;
+			if (lives === 3) {
+				document.getElementById('lives').innerHTML = '* * *';
+			} else if (lives === 2) {
+				document.getElementById('lives').innerHTML = '* *  ';
+			} else if (lives === 1) {
+				document.getElementById('lives').innerHTML = '*    ';
+			} else if (lives === 0) {
+				document.getElementById('lives').innerHTML = '     ';
+			}
 			
 			// Insert objects into quadtree
 			game.quadTree.clear();
@@ -280,7 +322,8 @@
 			
 			// No more enemies
 			if (game.enemyPool.getPool().length === 0) {
-				game.spawnWave();
+				game.playerLevel += 1;
+				game.spawnWave(game.playerLevel);
 			}
 			
 			// Animate game objects
@@ -490,7 +533,7 @@
 			var counter = 0;
 			this.collidableWith = "enemyBullet";
 			this.type = "ship";
-			
+			this.immune = false;
 			
 			this.init = function(x, y, width, height) {
 				// Defualt variables
@@ -504,8 +547,12 @@
 			}
 			
 			
-			this.draw = function() {
-				this.context.drawImage(imageRepository.spaceship, this.x, this.y);
+			this.draw = function(shipType) {
+				if (shipType === 'Immune') {
+					this.context.drawImage(imageRepository.shipImmune, this.x, this.y);
+				} else {
+					this.context.drawImage(imageRepository.spaceship, this.x, this.y);
+				}
 			};
 			this.move = function() {
 				counter++;
@@ -539,10 +586,26 @@
 				}
 				
 				// Redraw the ship
-				if (!this.isColliding) {
+				if (!this.isColliding && this.immune === true) {
+					this.isColliding = false;	//seems more stable for stray bullets
+					this.draw('Immune');
+				} else if (this.immune === true) {
+					this.isColliding = false;	//seems more stable for stray bullets
+					this.draw('Immune');
+				} else if (!this.isColliding) {
 					this.draw();
+				} else if (game.playerLives >= 1 ) {
+					this.immune = true;		//make temporaily immune to further collisions (ignore them)
+					this.isColliding = false;
+					game.playerLives -= 1;
+					this.draw('Immune');
+					var self = this;
+					clearImmunity(function() {
+						self.immune = false;
+					});
 				}
 				else {
+					game.playerLives -= 1;	//update screen to show zero lives
 					this.alive = false;
 					game.gameOver();
 				}
@@ -558,11 +621,17 @@
 			this.fire = function() {
 				this.bulletPool.getTwo(this.x+6, this.y, 3,
 									   this.x+33, this.y, 3);
-				//game.laser.get();			//Audio File corupted, needs replacing
+				game.laser.get();			//Audio File corupted, has been replaced
 			};
 		}
 		Ship.prototype = new Drawable();
 		
+		clearImmunity = function(callback) {
+					setTimeout(function() {
+					//console.log("Immunity Expired");
+					callback();
+				}, 3000
+				)};
 		
 		/**
 		* Create the Enemy ship object.
@@ -616,8 +685,15 @@
 					return false;
 				}
 				else {
-					game.playerScore += 10;
-					//game.explosion.get();		//Audio File corupted, needs replacing
+					//points gain based on level
+					if (game.playerLevel > 3) {
+						game.playerScore += (10 * game.playerLevel);
+					} else {
+						game.playerScore += 10;
+					}
+					
+					this.explode();				//explode transition/animation
+					game.explosion.get();		//Audio File corupted, has been replaced
 					return true;
 				}
 			};
@@ -626,6 +702,22 @@
 			 */
 			this.fire = function() {
 				game.enemyBulletPool.get(this.x+this.width/2, this.y+this.height, -2.5);
+			}
+			this.explode = function() {
+				
+				this.context.drawImage(imageRepository.explosion, this.x, this.y);
+				var x = this.x;
+				var y = this.y;
+				var w = this.width;
+				var h = this.height;
+				
+				var self = this;
+				
+				clearExplosion(function() {
+					self.context.clearRect(x-1, y, w+1, h);
+					//console.log("x: " + x + " y: " + y + " width: " + w + " height: " + h);
+				});
+				
 			}
 			/*
 			 * Resets the enemy values
@@ -642,6 +734,14 @@
 		}
 		Enemy.prototype = new Drawable();					
 		
+		clearExplosion = function(callback) {
+					setTimeout(function() {
+					//console.log("enemy explodes");
+					//this callback is ok because of the small timeframe, if it's too long it will disrupt the canvas too much
+					callback();
+				}, 250
+				)};
+		
 		/**
 		 * A sound pool to use for the sound effects
 		 */
@@ -657,16 +757,16 @@
 				if (object == "laser") {
 					for (var i = 0; i < size; i++) {
 						// Initalize the sound
-						laser = new Audio("sounds/laser.wav");
-						laser.volume = .12;
+						laser = new Audio("sounds/laser_blasts_1.mp3");
+						laser.volume = .10;
 						laser.load();
 						pool[i] = laser;
 					}
 				}
 				else if (object == "explosion") {
 					for (var i = 0; i < size; i++) {
-						var explosion = new Audio("sounds/explosion.wav");
-						explosion.volume = .1;
+						var explosion = new Audio("sounds/blast_1.mp3");
+						explosion.volume = .15;
 						explosion.load();
 						pool[i] = explosion;
 					}

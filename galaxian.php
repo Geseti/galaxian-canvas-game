@@ -31,6 +31,24 @@
 			font-size: 20px;
 			font-size: 3vw;
 		}
+		.level {
+			position: relative;
+			left: 500px;
+			color: #FF7F00;
+			font-family: Helvetica, sans-serif;
+			cursor: default;
+			font-size: 20px;
+			font-size: 3vw;	
+		}
+		.lives {
+			position: relative;
+			left: 500px;
+			color: #FF7F00;
+			font-family: Helvetica, sans-serif;
+			cursor: default;
+			font-size: 25px;
+			font-size: 3vw;	
+		}
 		.game-over {
 			position: relative;
 			top: 120px;
@@ -58,6 +76,15 @@
 		@media only screen and (min-width: 600px) {
 			.score {
 				font-size: 20px;
+				margin-left: 5px;
+			}
+			.level {
+				font-size: 20px;
+				margin-right 5px;
+			}
+			.lives {
+				font-size: 25px;
+				margin-right 5px;
 			}
 			.game-over {
 				font-size: 30px;
@@ -68,6 +95,12 @@
 			.game-over span {
 				top: -50px;
 				left: calc(0% - 125px);
+			}
+			.level {
+				left: 230px;
+			}
+			.lives {
+				left: 230px;
 			}
 		}
 		
@@ -98,6 +131,8 @@
 				<canvas id="ship" class='img-responsive' width="600" height="360">
 				</canvas>
 				<div class='score'>SCORE: <span id="score"></span></div>
+				<div class='level'>LEVEL: <span id='level'></span></div>
+				<div class='lives'><span id='lives'></span></div>
 				
 				<!--<div>-->
 					<!--<div class="container" style="text-align: center; vertical-align: middle; display: table-cell;">-->
@@ -113,6 +148,7 @@
 	</body>
 	
 	<!-- Game script files -->
+	<script src=".\js\jquery-3.2.1.js"></script>
 	<script src=".\js\galaxian.js"></script>
 	<script src=".\js\keycodes.js"></script>
 		
